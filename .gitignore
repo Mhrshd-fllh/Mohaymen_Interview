@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+env/
+venv/
+# Environment & Secrets
+.env
+# Docker & Persistence
+*.log
+.DS_Store
+# Spark & Checkpoints
+checkpoint/
+*.spark-checkpoint/
+spark-warehouse/
+
+# Datasets
+/Cities
+/REF_SMS
+

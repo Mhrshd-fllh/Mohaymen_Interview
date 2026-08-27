@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.database import get_db_session
 from app.models import CityCountry
@@ -34,12 +34,15 @@ async def upsert_city(payload: CityUpsertRequest, db: AsyncSession = Depends(get
                 country_code=payload.country_code
             ).on_conflict_do_update(
                 constraint="ix_city_country_city_name_lower",
+                index_elements = [text("LOWER(city_name)")],
                 set_={"country_code": payload.country_code, "updated_at": func.now()}
             ).returning(CityCountry)
         )
 
         result = await db.execute(upper_stmt)
         upserted_record = result.scalar_one()
+
+        await db.commit()
 
         return CityResponse(
             id=upserted_record.id,

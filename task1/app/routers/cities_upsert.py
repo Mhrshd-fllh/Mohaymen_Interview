@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import func, select, text
 
+from app.cache.redis_manager import RedisManager, get_redis_manager
 from app.database import get_db_session
 from app.models import CityCountry
 from app.schemas import CityUpsertRequest, CityResponse
@@ -13,7 +14,8 @@ router = APIRouter(prefix="/cities", tags=["Cities"])
              summary="Create or update a City-Country record", 
              response_model=CityResponse, 
              description="This endpoint allows you to insert a new city-country record or update an existing one based on the city name. If the city already exists, its country code will be updated.")
-async def upsert_city(payload: CityUpsertRequest, db: AsyncSession = Depends(get_db_session)) -> CityResponse:
+async def upsert_city(payload: CityUpsertRequest, db: AsyncSession = Depends(get_db_session), 
+                      cache_mangager: RedisManager = Depends(get_redis_manager)) -> CityResponse:
     """
     Upsert a city-country record in the database.
 
@@ -43,6 +45,8 @@ async def upsert_city(payload: CityUpsertRequest, db: AsyncSession = Depends(get
         upserted_record = result.scalar_one()
 
         await db.commit()
+
+        await cache_mangager.invalidate_city(payload.city)
 
         return CityResponse(
             id=upserted_record.id,

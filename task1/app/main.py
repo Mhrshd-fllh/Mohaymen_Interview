@@ -3,17 +3,27 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.cache.redis_manager import redis_manager
 from app.config import settings
 from app.database import engine, Base
-from app.routers import cities_upsert
+from app.routers import cities_upsert, cities_query
+from app.telemetry.kafka_producer import kafka_producer
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    await redis_manager.connect()
+
+    await kafka_producer.start()
+
     yield
 
+    await kafka_producer.stop()
+
+    await redis_manager.close()
+    
     await engine.dispose()
 
 app = FastAPI(
@@ -34,6 +44,7 @@ app.add_middleware(
 
 # Register API Routers
 app.include_router(cities_upsert.router)
+app.include_router(cities_query.router)
 
 @app.get("/health", tags=["Health"])
 async def health_check() -> dict:

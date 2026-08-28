@@ -15,6 +15,9 @@ checkpoint/
 *.spark-checkpoint/
 spark-warehouse/
 
+#MINIO runtime artifact
+task2_minio_data/
+
 # Datasets
 /Cities
 /REF_SMS

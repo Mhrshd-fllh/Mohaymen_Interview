@@ -72,6 +72,26 @@ services:
     networks:
       - task1_net
 
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: task1_api
+    restart: unless_stopped
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - task1_network0
+
 volumes:
   postgres_data:
     driver: local

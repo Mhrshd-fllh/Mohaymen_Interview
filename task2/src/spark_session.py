@@ -26,6 +26,7 @@ def get_spark_session(app_name: str = "Task2_Spark_MinIO_Pipeline") -> SparkSess
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
         .config("spark.sql.shuffle.partitions", "4")
+        .config("spark.sql.session.timeZone", "UTC")
     )
 
     spark = builder.getOrCreate()

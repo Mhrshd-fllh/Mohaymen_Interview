@@ -19,7 +19,7 @@ def convert_milli_rial_to_toman(
 ) -> DataFrame:
 
     clean_debit = coalesce(col(source_col), lit(0))
-    toman_expr = (clean_debit / lit(10000)).cast(DecimalType(18, 2))
+    toman_expr = (clean_debit / lit(10000)).cast(DecimalType(18, 4))
     return df.withColumn(target_col, toman_expr)
 
 

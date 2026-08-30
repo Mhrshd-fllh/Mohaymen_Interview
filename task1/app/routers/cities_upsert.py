@@ -14,7 +14,7 @@ logger = logging.getLogger("Cities_upsert")
 
 router = APIRouter(prefix="/cities", tags=["Cities"])
 
-@router.post("", status_code=status.HTTP_201_CREATED, 
+@router.post("", status_code=status.HTTP_200_OK, 
              summary="Create or update a City-Country record", 
              response_model=CityResponse, 
              description="This endpoint allows you to insert a new city-country record or update an existing one based on the city name. If the city already exists, its country code will be updated.")

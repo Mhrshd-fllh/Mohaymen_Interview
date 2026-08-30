@@ -51,7 +51,7 @@ class RedisManager:
 
         key = self._format_key(city_name)
         norm_city = city_name.strip().lower()
-
+        
         async with client.pipeline(transaction=True) as pipe:
             pipe.get(key)
             results = await pipe.execute()
@@ -61,8 +61,10 @@ class RedisManager:
         if value is not None:
             self._hits_count += 1
             now_ts = time.time()
-
+            cutoff_time = now_ts - self.CACHE_TTL_SECONDS
+            
             async with client.pipeline(transaction=True) as pipe:
+                pipe.zremrangebyscore(self.LRU_ZSET_KEY, 0, cutoff_time)
                 pipe.zadd(self.LRU_ZSET_KEY, {norm_city: now_ts})
                 pipe.expire(key, self.CACHE_TTL_SECONDS)
                 await pipe.execute()
@@ -83,25 +85,31 @@ class RedisManager:
         now_ts = time.time()
         evicted_city: Optional[str] = None
 
-        async with client.pipeline(transaction=True) as pipe:
-            pipe.set(key, country_code.strip().upper(), ex = self.CACHE_TTL_SECONDS)
-            pipe.zadd(self.LRU_ZSET_KEY, {norm_city: now_ts})
-            pipe.zcard(self.LRU_ZSET_KEY)
-            results = await pipe.execute()
+        
+        lock = client.lock("lock:city_cache", timeout=5.0)
 
-        cardinality: int = results[2]
+        async with lock:
+            cutoff_time = now_ts - self.CACHE_TTL_SECONDS
+            async with client.pipeline(transaction=True) as pipe:
+                pipe.zremrangebyscore(self.LRU_ZSET_KEY, 0, cutoff_time)
+                pipe.set(key, country_code.strip().upper(), ex = self.CACHE_TTL_SECONDS)
+                pipe.zadd(self.LRU_ZSET_KEY, {norm_city: now_ts})
+                pipe.zcard(self.LRU_ZSET_KEY)
+                results = await pipe.execute()
 
-        if cardinality > self.MAX_CACHE_KEYS:
-            evicted_items = await client.zpopmin(self.LRU_ZSET_KEY, count = 1)
-            if evicted_items:
-                raw_evicted, _score = evicted_items[0]
-                evicted_city = str(raw_evicted)
-                evicted_key = f"City:{evicted_city}"
-                await client.delete(evicted_key)
-                logger.info(
-                    "LRU Eviction Triggered: Cache exceeded %d keys. Evicted oldest key '%s'.",
-                    self.MAX_CACHE_KEYS, evicted_city
-                )
+            cardinality: int = results[3]
+
+            if cardinality > self.MAX_CACHE_KEYS:
+                evicted_items = await client.zpopmin(self.LRU_ZSET_KEY, count = 1)
+                if evicted_items:
+                    raw_evicted, _score = evicted_items[0]
+                    evicted_city = str(raw_evicted)
+                    evicted_key = self._format_key(evicted_city)
+                    await client.delete(evicted_key)
+                    logger.info(
+                        "LRU Eviction Triggered: Cache exceeded %d keys. Evicted oldest key '%s'.",
+                        self.MAX_CACHE_KEYS, evicted_city
+                    )
 
         logger.debug("Cache SET for city '%s' -> '%s' (TTL=%ds)", city_name, country_code, self.CACHE_TTL_SECONDS)
         return evicted_city
@@ -127,7 +135,7 @@ class RedisManager:
         client = await self._get_client()
 
         tracked_cities = await client.zrange(self.LRU_ZSET_KEY, 0, -1)
-        keys_to_delete = [f"City:{city}" for city in tracked_cities]
+        keys_to_delete = [self._format_key(str(city)) for city in tracked_cities]
         keys_to_delete.append(self.LRU_ZSET_KEY)
 
         if keys_to_delete:

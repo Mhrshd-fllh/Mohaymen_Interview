@@ -37,6 +37,6 @@ def prepare_sms_stream(raw_df: DataFrame) -> DataFrame:
         target_col="revenue"
     )
 
-    standardized_df = toman_df.withColumn("paytype", col("PAYTPE_515"))
+    standardized_df = toman_df.withColumn("paytype", col("PAYTYPE_515"))
 
     return standardized_df

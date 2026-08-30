@@ -187,10 +187,44 @@ You can run Task 1 using Docker Compose for all services, or run the background 
    ```bash
    pip install -r requirements.txt
    ```
-5. Run any streaming job:
-   ```bash
-   python jobs/report_1_daily_revenue.py
-   python jobs/report_2_windowed_revenue.py
-   python jobs/report_3_min_max_revenue.py
-   python jobs/report_4_reference_enriched_summary.py
-   ```
+5. Generate and stage streaming batches into MinIO:
+   - Generate test micro-batches with proper CSV headers from the raw dataset:
+     ```bash
+     python scripts/generate_batches.py
+     ```
+   - Upload the batches into MinIO input bucket (`s3a://telemetry-bucket/raw/`):
+     ```bash
+     python -c "
+     from src.minio_utils import MinIOManager
+     mgr = MinIOManager()
+     mgr.ensure_pipeline_buckets()
+     mgr.upload_file('test_stream/sms_batch_1.csv', 'telemetry-bucket', 'raw/sms_batch_1.csv')
+     mgr.upload_file('test_stream/sms_batch_2.csv', 'telemetry-bucket', 'raw/sms_batch_2.csv')
+     print('Test batches uploaded successfully!')
+     "
+     ```
+     *(Alternatively, to upload the entire master dataset directly without chunking:)*
+     ```bash
+     python -c "
+     from src.minio_utils import MinIOManager
+     mgr = MinIOManager()
+     mgr.ensure_pipeline_buckets()
+     mgr.upload_file('../REF_SMS/REF_CBS_SMS2.csv', 'telemetry-bucket', 'raw/REF_CBS_SMS2.csv')
+     print('Full dataset uploaded successfully!')
+     "
+     ```
+6. Run any streaming job / report:
+   - **Continuous Streaming Mode** (actively monitors for incoming data in MinIO):
+     ```bash
+     python jobs/report_1_daily_revenue.py
+     python jobs/report_2_windowed_revenue.py
+     python jobs/report_3_min_max_revenue.py
+     python jobs/report_4_reference_enriched_summary.py
+     ```
+   - **Single Batch Evaluation Mode** (`--once`, processes available data and exits):
+     ```bash
+     python jobs/report_1_daily_revenue.py --once
+     python jobs/report_2_windowed_revenue.py --once
+     python jobs/report_3_min_max_revenue.py --once
+     python jobs/report_4_reference_enriched_summary.py --once
+     ```

@@ -63,10 +63,8 @@ class TelemetryKafkaProducer:
             cache_hit: bool,
             latency_ms: float
     ) -> bool:
-        if not self._is_started or self.producer is None:
-            await self.start()
-            if not self._is_started or self.producer is None:
-                return False
+        if self._is_started or self.producer is None:
+            return False
 
         payload: Dict[str, Any] = {
             "event_id": str(uuid.uuid4()),
@@ -78,7 +76,7 @@ class TelemetryKafkaProducer:
         }
 
         try:
-            await self.producer.send_and_wait(
+            await self.producer.send(
                 self.topic,
                 value=payload,
                 key=city_name.lower().encode("utf-8")
